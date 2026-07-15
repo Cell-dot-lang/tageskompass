@@ -835,7 +835,14 @@ el.importInput.addEventListener("change",async event=>{
 });
 el.clearButton.addEventListener("click",()=>{if(!confirm("Wirklich alle Aufgaben, Check-ins und Journaleinträge auf diesem Gerät löschen?"))return;localStorage.removeItem(STORAGE_KEY);localStorage.removeItem(CALENDAR_KEY_STORAGE);location.reload();});
 
-if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./service-worker.js").catch(console.warn));}
+if("serviceWorker" in navigator){
+  window.addEventListener("load",async()=>{
+    try {
+      const registration=await navigator.serviceWorker.register("./service-worker.js?v=7",{updateViaCache:"none"});
+      await registration.update();
+    } catch(error) { console.warn(error); }
+  });
+}
 render();
 if (weatherIsStale()) setTimeout(()=>refreshWeather(false),450);
 if (state.settings.calendarEnabled && state.settings.calendarEndpoint) syncCalendar(false);
