@@ -284,19 +284,21 @@
 
       <section class="settings-section">
         <h3>Apple-Kalender</h3>
-        <p class="helper-text">Für die automatische Aktualisierung wird ein eigener Kalender-Worker verwendet. In der App steht nur dessen Adresse; dein iCloud-Kalender-Link bleibt als Geheimnis im Worker.</p>
+        <p class="helper-text">Der geschützte Kalender-Worker liest deine privaten iCloud-Kalender. Apple-ID und App-Passwort werden niemals in dieser App oder auf GitHub gespeichert.</p>
         <label class="switch-row">
           <span>Apple-Kalender automatisch laden</span>
           <input id="calendarEnabled" type="checkbox" />
         </label>
         <label for="calendarEndpoint">Kalender-Worker-Endpunkt</label>
         <input id="calendarEndpoint" type="url" placeholder="https://dein-kalender-worker.workers.dev" />
+        <label for="calendarAccessKey">Privater Zugriffsschlüssel</label>
+        <input id="calendarAccessKey" type="password" autocomplete="off" placeholder="Dein selbst gewählter langer Schlüssel" />
         <div class="button-row">
           <button id="testCalendarButton" class="secondary-button grow">Verbindung testen</button>
           <label class="secondary-button grow file-button compact-file">ICS-Datei importieren<input id="calendarImportInput" type="file" accept=".ics,text/calendar" /></label>
         </div>
         <p id="calendarTestResult" class="settings-note"></p>
-        <p class="privacy-note">Ein öffentlicher iCloud-Kalender-Link ist grundsätzlich für Personen mit dem Link lesbar. Verwende dafür am besten einen eigenen Kalender, der nur die Termine enthält, die im Planer erscheinen sollen.</p>
+        <p class="privacy-note">Der Zugriffsschlüssel wird nur auf diesem Gerät gespeichert und nicht in Backups exportiert. Deine sieben iCloud-Kalender bleiben privat.</p>
       </section>
 
       <section class="settings-section">

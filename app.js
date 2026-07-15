@@ -92,6 +92,7 @@ const QUESTION_BY_EMOTION = {
 };
 
 const state = loadState();
+const CALENDAR_KEY_STORAGE = "tageskompass-calendar-access-key-v1";
 let selectedDate = startOfToday();
 let currentView = "home";
 let saveTimer = null;
@@ -104,7 +105,7 @@ const el = Object.fromEntries([
   "journalText","journalSaveStatus","reflectionOutput","createReflectionButton","clearReflectionButton","previousButton","nextButton",
   "dateButton","weekTab","dayTab","addTaskButton","taskDialog","taskForm","taskDialogTitle","taskTitle","taskTime","taskCategory",
   "taskId","closeTaskDialog","taskTemplate","settingsButton","settingsDialog","closeSettingsDialog","installButton","exportButton",
-  "importInput","clearButton","calendarEnabled","calendarEndpoint","testCalendarButton","calendarImportInput","calendarTestResult","aiEnabled","aiEndpoint","testAiButton","aiTestResult"
+  "importInput","clearButton","calendarEnabled","calendarEndpoint","calendarAccessKey","testCalendarButton","calendarImportInput","calendarTestResult","aiEnabled","aiEndpoint","testAiButton","aiTestResult"
 ].map(id => [id, document.getElementById(id)]));
 
 function defaultState() {
@@ -474,26 +475,28 @@ function renderCalendarEvents() {
 }
 async function syncCalendar(showResult = false) {
   const endpoint = (state.settings.calendarEndpoint || "").trim().replace(/\/$/,"");
+  const accessKey = localStorage.getItem(CALENDAR_KEY_STORAGE) || "";
   if (!state.settings.calendarEnabled || !endpoint) {
     if (showResult) el.calendarTestResult.textContent = "Aktiviere den Kalender und trage den Worker-Endpunkt ein.";
     renderCalendarEvents(); return false;
   }
+  if (!accessKey) { if (showResult) el.calendarTestResult.textContent = "Trage zusätzlich deinen privaten Zugriffsschlüssel ein."; return false; }
   if (showResult) el.calendarTestResult.textContent = "Kalender wird geladen …";
   else el.calendarStatus.textContent = "Kalender wird aktualisiert …";
   try {
     const separator = endpoint.includes("?") ? "&" : "?";
-    const response = await fetch(endpoint + "/calendar" + separator + "fresh=" + Date.now(), {headers:{"Accept":"application/json"},cache:"no-store"});
+    const response = await fetch(endpoint + "/calendar" + separator + "fresh=" + Date.now(), {headers:{"Accept":"application/json","Authorization":`Bearer ${accessKey}`},cache:"no-store"});
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
     if (!Array.isArray(payload.events)) throw new Error("Ungültige Kalenderantwort");
     state.calendarEvents = payload.events.map(normalizeCalendarEvent).filter(Boolean);
     state.calendarLastSync = new Date().toISOString();
     saveState(); render();
-    if (showResult) el.calendarTestResult.textContent = `${state.calendarEvents.length} Termine erfolgreich geladen.`;
+    if (showResult) el.calendarTestResult.textContent = `${state.calendarEvents.length} Termine aus deinen privaten iCloud-Kalendern geladen.`;
     return true;
   } catch (error) {
     console.warn("Kalender konnte nicht geladen werden", error);
-    if (showResult) el.calendarTestResult.textContent = "Keine Verbindung. Prüfe Worker-Adresse, Freigabe und CORS-Einstellungen.";
+    if (showResult) el.calendarTestResult.textContent = error.message === "HTTP 401" ? "Zugriffsschlüssel stimmt nicht." : "Keine Verbindung. Prüfe Worker-Adresse und Cloudflare-Secrets.";
     else el.calendarStatus.textContent = "Kalender konnte nicht aktualisiert werden. Gespeicherte Termine bleiben sichtbar.";
     return false;
   }
@@ -777,12 +780,13 @@ el.taskForm.addEventListener("submit",event=>{
   saveState();el.taskDialog.close();renderTasks(data);
 });
 
-el.settingsButton.addEventListener("click",()=>{el.calendarEnabled.checked=!!state.settings.calendarEnabled;el.calendarEndpoint.value=state.settings.calendarEndpoint||"";el.calendarTestResult.textContent="";el.aiEnabled.checked=!!state.settings.aiEnabled;el.aiEndpoint.value=state.settings.aiEndpoint||"";el.aiTestResult.textContent="";el.settingsDialog.showModal();});
+el.settingsButton.addEventListener("click",()=>{el.calendarEnabled.checked=!!state.settings.calendarEnabled;el.calendarEndpoint.value=state.settings.calendarEndpoint||"";el.calendarAccessKey.value=localStorage.getItem(CALENDAR_KEY_STORAGE)||"";el.calendarTestResult.textContent="";el.aiEnabled.checked=!!state.settings.aiEnabled;el.aiEndpoint.value=state.settings.aiEndpoint||"";el.aiTestResult.textContent="";el.settingsDialog.showModal();});
 el.closeSettingsDialog.addEventListener("click",()=>el.settingsDialog.close());
 
 el.calendarEnabled.addEventListener("change",()=>{state.settings.calendarEnabled=el.calendarEnabled.checked;saveState();});
 el.calendarEndpoint.addEventListener("change",()=>{state.settings.calendarEndpoint=el.calendarEndpoint.value.trim();saveState();});
-el.testCalendarButton.addEventListener("click",async()=>{state.settings.calendarEnabled=el.calendarEnabled.checked;state.settings.calendarEndpoint=el.calendarEndpoint.value.trim();saveState();await syncCalendar(true);});
+el.calendarAccessKey.addEventListener("change",()=>{localStorage.setItem(CALENDAR_KEY_STORAGE,el.calendarAccessKey.value.trim());});
+el.testCalendarButton.addEventListener("click",async()=>{state.settings.calendarEnabled=el.calendarEnabled.checked;state.settings.calendarEndpoint=el.calendarEndpoint.value.trim();localStorage.setItem(CALENDAR_KEY_STORAGE,el.calendarAccessKey.value.trim());saveState();await syncCalendar(true);});
 el.calendarImportInput.addEventListener("change",async event=>{const file=event.target.files?.[0];if(!file)return;try{const events=parseIcsEvents(await file.text());state.calendarEvents=events;state.calendarLastSync=new Date().toISOString();saveState();el.calendarTestResult.textContent=`${events.length} Termine aus der ICS-Datei importiert.`;render();}catch(error){el.calendarTestResult.textContent="Die ICS-Datei konnte nicht gelesen werden.";}finally{event.target.value="";}});
 el.aiEnabled.addEventListener("change",()=>{state.settings.aiEnabled=el.aiEnabled.checked;saveState();});
 el.aiEndpoint.addEventListener("change",()=>{state.settings.aiEndpoint=el.aiEndpoint.value.trim();saveState();});
@@ -805,7 +809,7 @@ el.importInput.addEventListener("change",async event=>{
   catch { alert("Die Backup-Datei konnte nicht gelesen werden."); }
   finally { event.target.value=""; }
 });
-el.clearButton.addEventListener("click",()=>{if(!confirm("Wirklich alle Aufgaben, Check-ins und Journaleinträge auf diesem Gerät löschen?"))return;localStorage.removeItem(STORAGE_KEY);location.reload();});
+el.clearButton.addEventListener("click",()=>{if(!confirm("Wirklich alle Aufgaben, Check-ins und Journaleinträge auf diesem Gerät löschen?"))return;localStorage.removeItem(STORAGE_KEY);localStorage.removeItem(CALENDAR_KEY_STORAGE);location.reload();});
 
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./service-worker.js").catch(console.warn));}
 render();
