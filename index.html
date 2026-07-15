@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#172033" />
+  <meta name="theme-color" content="#ff5fa2" />
   <meta name="description" content="Privater Wochen- und Tagesplaner mit Journal und Gefühlsreflexion." />
   <meta name="color-scheme" content="light" />
   <link rel="manifest" href="manifest.webmanifest" />
@@ -38,6 +38,27 @@
           <button id="homeOpenDay" class="primary-button">Tag öffnen</button>
           <button id="homeQuickTask" class="secondary-button">+ Aufgabe</button>
         </div>
+      </section>
+
+      <section class="daily-delight-grid" aria-label="Tagesbegleitung">
+        <article class="card quote-card">
+          <span class="sticker-doodle" aria-hidden="true">🌷</span>
+          <p class="eyebrow">SPRÜCHCHEN DES TAGES</p>
+          <blockquote id="homeQuote">Du bist genug – auch an langsamen Tagen.</blockquote>
+          <p class="quote-note">Für dich, nicht für deine To-do-Liste.</p>
+        </article>
+        <article class="card weather-card">
+          <div class="weather-topline">
+            <div><p class="eyebrow">WETTER BEI DIR</p><p id="weatherStatus" class="weather-status">Standort wird noch nicht verwendet.</p></div>
+            <span id="weatherIcon" class="weather-icon" aria-hidden="true">🌤️</span>
+          </div>
+          <div id="weatherValues" class="weather-values" hidden>
+            <strong id="weatherCurrent">–°</strong>
+            <span>↑ <b id="weatherHigh">–°</b></span>
+            <span>↓ <b id="weatherLow">–°</b></span>
+          </div>
+          <button id="weatherButton" class="weather-button" type="button">Standort erlauben & Wetter laden</button>
+        </article>
       </section>
 
       <section class="dashboard-grid">

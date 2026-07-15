@@ -19,6 +19,26 @@ const CHECKINS = [
   { id: "sensory", label: "Reizpuffer", low: "überreizt", high: "stabil" },
   { id: "regulation", label: "Gefühle regulieren", low: "übernehmen mich", high: "gut steuerbar" }
 ];
+const DAILY_QUOTES = [
+  "Du bist genug – auch wenn heute weniger geht als gestern.", "Dein Wert steht auf keiner To-do-Liste.",
+  "Langsam ist immer noch eine Richtung.", "Eine Pause ist kein Rückschritt. Sie ist Versorgung.",
+  "Du musst heute nichts beweisen, um liebenswert zu sein.", "Auch ein kleiner Schritt darf heute der ganze Erfolg sein.",
+  "Dein Gehirn arbeitet anders – nicht falsch.", "Du darfst freundlich mit dir sprechen, besonders an schweren Tagen.",
+  "Nicht alles, was dringend wirkt, ist wirklich wichtig.", "Ausruhen zählt. Atmen zählt. Du zählst.",
+  "Du darfst den Tag kleiner machen, bis er zu dir passt.", "Genug getan ist besser als dich selbst zu übergehen.",
+  "Heute darfst du deinem Tempo vertrauen.", "Du bist mehr als deine Produktivität.", "Unfertig bedeutet nicht gescheitert.",
+  "Du darfst neu anfangen, ohne dich für den ersten Versuch zu verurteilen.",
+  "Ein überforderter Moment sagt nichts über deine Fähigkeiten aus.", "Deine Bedürfnisse sind keine Störung.",
+  "Du musst nicht erst erschöpft sein, um eine Pause zu verdienen.", "Heute darf leicht sein, wo leicht möglich ist.",
+  "Es ist okay, wenn dein bester Schritt heute Fürsorge heißt.", "Du bist nicht zu viel. Vielleicht war es einfach gerade zu viel.",
+  "Fortschritt darf bunt, krumm und unregelmäßig sein.", "Du darfst stolz auf Dinge sein, die andere gar nicht sehen.",
+  "Sanft mit dir zu sein ist kein Aufgeben.", "Du bist bereits ein ganzer Mensch – auch mitten im Chaos.",
+  "Manchmal ist Entschleunigen die mutigste Entscheidung des Tages.",
+  "Dein heutiges Können muss nicht deinem gestrigen entsprechen.", "Du darfst Hilfe brauchen und trotzdem stark sein.",
+  "Heute reicht es, hier zu sein."
+];
+const WEATHER_ICONS = {0:"☀️",1:"🌤️",2:"⛅",3:"☁️",45:"🌫️",48:"🌫️",51:"🌦️",53:"🌦️",55:"🌧️",56:"🌧️",57:"🌧️",61:"🌧️",63:"🌧️",65:"🌧️",66:"🌧️",67:"🌧️",71:"🌨️",73:"🌨️",75:"❄️",77:"❄️",80:"🌦️",81:"🌧️",82:"⛈️",85:"🌨️",86:"❄️",95:"⛈️",96:"⛈️",99:"⛈️"};
+const WEATHER_CACHE_KEY = "tageskompass-weather-v1";
 const BOTTLENECKS = [
   { id: "start", label: "Starten" },
   { id: "unclear", label: "Aufgabe unklar" },
@@ -79,7 +99,7 @@ let deferredInstallPrompt = null;
 
 const el = Object.fromEntries([
   "pageTitle","headerSubtitle","homeView","weekView","dayView","weekDays","weeklyFocus","weekReflection","createWeekReflection",
-  "homeGreeting","homeDate","homeOpenDay","homeQuickTask","homePriority","homeSupport","homeCare","homeCareBar","homeEvents","homeEventsEmpty","homeRefreshCalendar","homeCheckinCount","homeCheckinSummary","homeJournalTitle","homeJournalText","homeOpenJournal","homeTab",
+  "homeGreeting","homeDate","homeOpenDay","homeQuickTask","homePriority","homeSupport","homeCare","homeCareBar","homeEvents","homeEventsEmpty","homeRefreshCalendar","homeCheckinCount","homeCheckinSummary","homeJournalTitle","homeJournalText","homeOpenJournal","homeTab","homeQuote","weatherStatus","weatherIcon","weatherValues","weatherCurrent","weatherHigh","weatherLow","weatherButton",
   "dayHeading","dayPriority","checkinStatus","checkinGrid","sleepHours","medicationState","sideEffectsWrap","sideEffectsText","bottleneckChips","adhdSupportBox","calendarStatus","calendarEventList","refreshCalendarButton","taskCounter","taskList","emptyTasks","habitCounter","habitList",
   "journalText","journalSaveStatus","reflectionOutput","createReflectionButton","clearReflectionButton","previousButton","nextButton",
   "dateButton","weekTab","dayTab","addTaskButton","taskDialog","taskForm","taskDialogTitle","taskTitle","taskTime","taskCategory",
@@ -200,6 +220,32 @@ function supportSuggestions(data) {
   return suggestions;
 }
 
+function dailyQuoteIndex(date = startOfToday()) {
+  const key = isoDate(date).replaceAll("-", ""); let hash = 0;
+  for (const char of key) hash = ((hash * 31) + char.charCodeAt(0)) >>> 0;
+  return hash % DAILY_QUOTES.length;
+}
+function renderDailyQuote() { el.homeQuote.textContent = DAILY_QUOTES[dailyQuoteIndex()]; }
+function readWeatherCache() { try { return JSON.parse(localStorage.getItem(WEATHER_CACHE_KEY) || "null"); } catch { return null; } }
+function renderWeather(data = readWeatherCache()) {
+  if (!data) { el.weatherValues.hidden=true; el.weatherStatus.textContent="Tippe einmal, um deinen Standort freizugeben."; el.weatherButton.textContent="Standort erlauben & Wetter laden"; return; }
+  el.weatherValues.hidden=false; el.weatherCurrent.textContent=Math.round(data.current)+"°"; el.weatherHigh.textContent=Math.round(data.high)+"°"; el.weatherLow.textContent=Math.round(data.low)+"°";
+  el.weatherIcon.textContent=WEATHER_ICONS[data.code]||"🌈"; el.weatherStatus.textContent="Aktuell · "+new Intl.DateTimeFormat("de-DE",{hour:"2-digit",minute:"2-digit"}).format(new Date(data.updatedAt))+" Uhr"; el.weatherButton.textContent="Wetter aktualisieren";
+}
+function getCurrentPosition() { return new Promise((resolve,reject)=>{ if(!navigator.geolocation)return reject(new Error("Geolocation nicht unterstützt")); navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:false,timeout:12000,maximumAge:15*60*1000}); }); }
+async function refreshWeather(showLoading = true) {
+  if(showLoading){el.weatherButton.disabled=true;el.weatherButton.textContent="Wetter wird geladen …";el.weatherStatus.textContent="Standort wird abgefragt …";}
+  try {
+    const position=await getCurrentPosition(); const latitude=position.coords.latitude.toFixed(4); const longitude=position.coords.longitude.toFixed(4);
+    const url="https://api.open-meteo.com/v1/forecast?latitude="+latitude+"&longitude="+longitude+"&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1";
+    const response=await fetch(url,{headers:{"Accept":"application/json"}}); if(!response.ok)throw new Error("Wetterdienst HTTP "+response.status); const payload=await response.json();
+    const data={current:payload.current?.temperature_2m,high:payload.daily?.temperature_2m_max?.[0],low:payload.daily?.temperature_2m_min?.[0],code:payload.current?.weather_code,updatedAt:new Date().toISOString()};
+    if(![data.current,data.high,data.low].every(Number.isFinite))throw new Error("Unvollständige Wetterdaten"); localStorage.setItem(WEATHER_CACHE_KEY,JSON.stringify(data)); renderWeather(data);
+  } catch(error) { console.warn("Wetter konnte nicht geladen werden",error); const cached=readWeatherCache(); renderWeather(cached); el.weatherStatus.textContent=cached?"Keine Aktualisierung möglich · letzter gespeicherter Stand":"Standort nicht freigegeben oder Wetterdienst nicht erreichbar."; }
+  finally { el.weatherButton.disabled=false; }
+}
+function weatherIsStale(){const cached=readWeatherCache();return !cached||Date.now()-new Date(cached.updatedAt).getTime()>30*60*1000;}
+
 function renderHome() {
   selectedDate = startOfToday();
   const data = getDayData(selectedDate);
@@ -207,6 +253,8 @@ function renderHome() {
   el.dateButton.textContent = "Heute";
   el.homeGreeting.textContent = hour < 11 ? "Guten Morgen, Tim" : hour < 18 ? "Hallo Tim" : "Guten Abend, Tim";
   el.homeDate.textContent = formatDate(selectedDate,{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
+  renderDailyQuote();
+  renderWeather();
   el.homePriority.textContent = data.priority || "Noch kein Tagesziel";
   const support = supportSuggestions(data);
   el.homeSupport.textContent = support.length ? support[0] : "Öffne den Tag und lege einen kleinen, konkreten Schritt fest.";
@@ -433,7 +481,8 @@ async function syncCalendar(showResult = false) {
   if (showResult) el.calendarTestResult.textContent = "Kalender wird geladen …";
   else el.calendarStatus.textContent = "Kalender wird aktualisiert …";
   try {
-    const response = await fetch(endpoint + "/calendar", {headers:{"Accept":"application/json"}});
+    const separator = endpoint.includes("?") ? "&" : "?";
+    const response = await fetch(endpoint + "/calendar" + separator + "fresh=" + Date.now(), {headers:{"Accept":"application/json"},cache:"no-store"});
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
     if (!Array.isArray(payload.events)) throw new Error("Ungültige Kalenderantwort");
@@ -701,6 +750,7 @@ el.homeOpenDay.addEventListener("click",()=>{selectedDate=startOfToday();switchV
 el.homeQuickTask.addEventListener("click",()=>{selectedDate=startOfToday();openTaskDialog();});
 el.homeOpenJournal.addEventListener("click",()=>{selectedDate=startOfToday();switchView("day");setTimeout(()=>el.journalText.focus(),80);});
 el.homeRefreshCalendar.addEventListener("click",()=>syncCalendar(false));
+el.weatherButton.addEventListener("click",()=>refreshWeather(true));
 el.previousButton.addEventListener("click",()=>navigate(-1));
 el.nextButton.addEventListener("click",()=>navigate(1));
 el.dateButton.addEventListener("click",()=>{selectedDate=startOfToday();render();});
@@ -759,4 +809,11 @@ el.clearButton.addEventListener("click",()=>{if(!confirm("Wirklich alle Aufgaben
 
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./service-worker.js").catch(console.warn));}
 render();
+if (weatherIsStale()) setTimeout(()=>refreshWeather(false),450);
 if (state.settings.calendarEnabled && state.settings.calendarEndpoint) syncCalendar(false);
+
+function calendarIsStale(){if(!state.calendarLastSync)return true;const last=new Date(state.calendarLastSync).getTime();return !Number.isFinite(last)||Date.now()-last>15*60*1000;}
+function refreshLiveData(){if(weatherIsStale())refreshWeather(false);if(state.settings.calendarEnabled&&state.settings.calendarEndpoint&&calendarIsStale())syncCalendar(false);}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")refreshLiveData();});
+window.addEventListener("focus",refreshLiveData);
+window.addEventListener("online",refreshLiveData);
