@@ -14,7 +14,7 @@
 <body>
   <header class="app-header">
     <div>
-      <p class="eyebrow">MEIN TAGESKOMPASS</p>
+      <p class="eyebrow">✿ MEIN TAGESKOMPASS ✦</p>
       <h1 id="pageTitle">Wochenplan</h1>
       <p id="headerSubtitle" class="header-subtitle"></p>
     </div>
@@ -31,13 +31,28 @@
 
     <section id="homeView" class="view active" aria-label="Heute-Dashboard">
       <section class="card hero-card">
-        <p class="eyebrow">HEUTE</p>
+        <span class="hero-sticker" aria-hidden="true">TODAY!</span>
+        <span class="hero-spark hero-spark-one" aria-hidden="true">✦</span>
+        <span class="hero-spark hero-spark-two" aria-hidden="true">✿</span>
+        <p class="eyebrow">☀ HEUTE</p>
         <h2 id="homeGreeting">Guten Morgen, Tim</h2>
         <p id="homeDate" class="header-subtitle"></p>
         <div class="hero-actions">
           <button id="homeOpenDay" class="primary-button">Tag öffnen</button>
           <button id="homeQuickTask" class="secondary-button">+ Aufgabe</button>
         </div>
+      </section>
+
+      <section class="home-week-section" aria-labelledby="homeWeekTitle">
+        <div class="notebook-heading">
+          <div>
+            <p class="eyebrow">DEINE WOCHE</p>
+            <h2 id="homeWeekTitle">Auf einen Blick</h2>
+          </div>
+          <span aria-hidden="true">🌈</span>
+        </div>
+        <div id="homeWeekStrip" class="home-week-strip"></div>
+        <p class="swipe-hint">Wische seitlich · Tippe einen Tag zum Öffnen</p>
       </section>
 
       <section class="daily-delight-grid" aria-label="Tagesbegleitung">
@@ -234,9 +249,9 @@
   </main>
 
   <nav class="bottom-nav" aria-label="Hauptnavigation">
-    <button id="homeTab" class="tab active" data-view="home"><span>⌂</span><small>Heute</small></button>
-    <button id="weekTab" class="tab" data-view="week"><span>▦</span><small>Woche</small></button>
-    <button id="dayTab" class="tab" data-view="day"><span>□</span><small>Tag</small></button>
+    <button id="homeTab" class="tab active" data-view="home"><span>🏠</span><small>Heute</small></button>
+    <button id="weekTab" class="tab" data-view="week"><span>🌈</span><small>Woche</small></button>
+    <button id="dayTab" class="tab" data-view="day"><span>✏️</span><small>Mein Tag</small></button>
   </nav>
 
   <dialog id="taskDialog">

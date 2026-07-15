@@ -100,7 +100,7 @@ let deferredInstallPrompt = null;
 
 const el = Object.fromEntries([
   "pageTitle","headerSubtitle","homeView","weekView","dayView","weekDays","weeklyFocus","weekReflection","createWeekReflection",
-  "homeGreeting","homeDate","homeOpenDay","homeQuickTask","homePriority","homeSupport","homeCare","homeCareBar","homeEvents","homeEventsEmpty","homeRefreshCalendar","homeCheckinCount","homeCheckinSummary","homeJournalTitle","homeJournalText","homeOpenJournal","homeTab","homeQuote","weatherStatus","weatherIcon","weatherValues","weatherCurrent","weatherHigh","weatherLow","weatherButton",
+  "homeGreeting","homeDate","homeOpenDay","homeQuickTask","homeWeekStrip","homePriority","homeSupport","homeCare","homeCareBar","homeEvents","homeEventsEmpty","homeRefreshCalendar","homeCheckinCount","homeCheckinSummary","homeJournalTitle","homeJournalText","homeOpenJournal","homeTab","homeQuote","weatherStatus","weatherIcon","weatherValues","weatherCurrent","weatherHigh","weatherLow","weatherButton",
   "dayHeading","dayPriority","checkinStatus","checkinGrid","sleepHours","medicationState","sideEffectsWrap","sideEffectsText","bottleneckChips","adhdSupportBox","calendarStatus","calendarEventList","refreshCalendarButton","taskCounter","taskList","emptyTasks","habitCounter","habitList",
   "journalText","journalSaveStatus","reflectionOutput","createReflectionButton","clearReflectionButton","previousButton","nextButton",
   "dateButton","weekTab","dayTab","addTaskButton","taskDialog","taskForm","taskDialogTitle","taskTitle","taskTime","taskCategory",
@@ -247,6 +247,29 @@ async function refreshWeather(showLoading = true) {
 }
 function weatherIsStale(){const cached=readWeatherCache();return !cached||Date.now()-new Date(cached.updatedAt).getTime()>30*60*1000;}
 
+function renderHomeWeek() {
+  const monday = mondayOf(startOfToday());
+  el.homeWeekStrip.innerHTML = "";
+  for (let i = 0; i < 7; i++) {
+    const date = addDays(monday, i);
+    const data = getDayData(date);
+    const open = data.tasks.filter(task => !task.done).length;
+    const events = eventsForDate(date).length;
+    const isToday = isoDate(date) === isoDate(startOfToday());
+    const button = document.createElement("button");
+    button.className = `home-week-day color-${i + 1}${isToday ? " today" : ""}`;
+    button.setAttribute("aria-label", `${formatDate(date,{weekday:"long",day:"numeric",month:"long"})} öffnen`);
+    button.innerHTML = `
+      <span class="week-day-name">${escapeHtml(formatDate(date,{weekday:"short"}))}</span>
+      <strong>${escapeHtml(formatDate(date,{day:"2-digit"}))}</strong>
+      <span class="week-day-dots"><i title="${events} Termine">${events ? "●" : "○"}</i><i title="${open} Aufgaben">${open ? "★" : "☆"}</i></span>
+      <small>${events}T · ${open}A</small>`;
+    button.addEventListener("click", () => { selectedDate = date; currentView = "day"; render(); });
+    el.homeWeekStrip.appendChild(button);
+  }
+  requestAnimationFrame(() => el.homeWeekStrip.querySelector(".today")?.scrollIntoView({inline:"center",block:"nearest"}));
+}
+
 function renderHome() {
   selectedDate = startOfToday();
   const data = getDayData(selectedDate);
@@ -256,6 +279,7 @@ function renderHome() {
   el.homeDate.textContent = formatDate(selectedDate,{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
   renderDailyQuote();
   renderWeather();
+  renderHomeWeek();
   el.homePriority.textContent = data.priority || "Noch kein Tagesziel";
   const support = supportSuggestions(data);
   el.homeSupport.textContent = support.length ? support[0] : "Öffne den Tag und lege einen kleinen, konkreten Schritt fest.";
