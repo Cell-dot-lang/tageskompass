@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#172033" />
+  <meta name="description" content="Privater Wochen- und Tagesplaner mit Journal und Gefühlsreflexion." />
+  <meta name="color-scheme" content="light" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Mein Tageskompass</title>
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">MEIN TAGESKOMPASS</p>
+      <h1 id="pageTitle">Wochenplan</h1>
+      <p id="headerSubtitle" class="header-subtitle"></p>
+    </div>
+    <button id="settingsButton" class="icon-button" aria-label="Einstellungen öffnen">•••</button>
+  </header>
+
+  <main>
+    <section class="toolbar card compact-card" aria-label="Datum auswählen">
+      <button id="previousButton" class="nav-button" aria-label="Zurück">‹</button>
+      <button id="dateButton" class="date-button">Heute</button>
+      <button id="nextButton" class="nav-button" aria-label="Weiter">›</button>
+    </section>
+
+
+    <section id="homeView" class="view active" aria-label="Heute-Dashboard">
+      <section class="card hero-card">
+        <p class="eyebrow">HEUTE</p>
+        <h2 id="homeGreeting">Guten Morgen, Tim</h2>
+        <p id="homeDate" class="header-subtitle"></p>
+        <div class="hero-actions">
+          <button id="homeOpenDay" class="primary-button">Tag öffnen</button>
+          <button id="homeQuickTask" class="secondary-button">+ Aufgabe</button>
+        </div>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="card dashboard-card">
+          <p class="eyebrow">NÄCHSTER SCHRITT</p>
+          <h3 id="homePriority">Noch kein Tagesziel</h3>
+          <p id="homeSupport" class="helper-text">Öffne den Tag und lege einen kleinen, konkreten Schritt fest.</p>
+        </article>
+        <article class="card dashboard-card">
+          <p class="eyebrow">GRUNDVERSORGUNG</p>
+          <h3 id="homeCare">0 von 8 erledigt</h3>
+          <div id="homeCareBar" class="mini-progress"><span></span></div>
+        </article>
+      </section>
+
+      <section class="card">
+        <div class="section-heading">
+          <div><p class="eyebrow">TERMINE</p><h2>Als Nächstes</h2></div>
+          <button id="homeRefreshCalendar" class="ghost-button small-button">Aktualisieren</button>
+        </div>
+        <div id="homeEvents" class="calendar-event-list"></div>
+        <p id="homeEventsEmpty" class="empty-state">Heute stehen keine importierten Termine an.</p>
+      </section>
+
+      <section class="card">
+        <div class="section-heading">
+          <div><p class="eyebrow">KURZÜBERBLICK</p><h2>Dein System heute</h2></div>
+          <span id="homeCheckinCount" class="counter">0/6</span>
+        </div>
+        <div id="homeCheckinSummary" class="dashboard-metrics"></div>
+      </section>
+
+      <section class="card journal-prompt-card">
+        <p class="eyebrow">TAGESJOURNAL</p>
+        <h2 id="homeJournalTitle">Gedanken festhalten</h2>
+        <p id="homeJournalText" class="helper-text">Ein paar freie Sätze reichen. Später erstellt der Planer daraus eine Gefühlsreflexion.</p>
+        <button id="homeOpenJournal" class="secondary-button full-width">Zum Journal</button>
+      </section>
+    </section>
+
+    <section id="weekView" class="view" aria-label="Wochenansicht">
+      <div class="card">
+        <label for="weeklyFocus">Fokus der Woche</label>
+        <textarea id="weeklyFocus" rows="2" placeholder="Was soll diese Woche Orientierung geben?"></textarea>
+      </div>
+      <div id="weekDays" class="week-days"></div>
+      <section class="card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">WOCHENRÜCKBLICK</p>
+            <h2>Was war diese Woche los?</h2>
+          </div>
+          <button id="createWeekReflection" class="secondary-button">Auswerten</button>
+        </div>
+        <div id="weekReflection" class="reflection-placeholder">Am Ende der Woche kannst du Energie, Startfähigkeit, Reizlast, Grundversorgung und Journalreflexionen gemeinsam betrachten.</div>
+      </section>
+    </section>
+
+    <section id="dayView" class="view" aria-label="Tagesansicht">
+      <section class="card day-intro">
+        <div>
+          <p class="eyebrow">TAGESPLAN</p>
+          <h2 id="dayHeading"></h2>
+        </div>
+        <button id="addTaskButton" class="primary-button">+ Aufgabe</button>
+      </section>
+
+      <section class="card">
+        <label for="dayPriority">Mein wichtigster Schritt heute</label>
+        <input id="dayPriority" type="text" maxlength="180" placeholder="Klein und konkret: Was soll heute gelingen?" />
+      </section>
+
+      <section class="card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">ADHS-CHECK-IN</p>
+            <h2>Was ist heute verfügbar?</h2>
+          </div>
+          <span id="checkinStatus" class="counter">offen</span>
+        </div>
+        <p class="helper-text">Kein Leistungstest: Nimm nur wahr, wie dein System gerade arbeitet. 1 bedeutet kaum verfügbar oder stark belastet, 5 bedeutet gut verfügbar.</p>
+        <div id="checkinGrid" class="checkin-grid"></div>
+
+        <div class="checkin-meta-grid">
+          <div>
+            <label for="sleepHours">Schlafdauer <span class="optional-label">optional</span></label>
+            <div class="input-with-unit"><input id="sleepHours" type="number" min="0" max="16" step="0.5" inputmode="decimal" placeholder="z. B. 7,5" /><span>Std.</span></div>
+          </div>
+          <div>
+            <label for="medicationState">Elvanse 60 mg morgens <span class="optional-label">Wirkung</span></label>
+            <select id="medicationState">
+              <option value="">Nicht eingetragen</option>
+              <option value="not_yet">Noch nicht genommen</option>
+              <option value="fitting">Wirkt heute passend</option>
+              <option value="weak_unclear">Wirkung schwach oder unklar</option>
+              <option value="side_effects">Nebenwirkungen bemerkt</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="sideEffectsWrap" class="conditional-field" hidden>
+          <label for="sideEffectsText">Welche Nebenwirkungen hast du bemerkt?</label>
+          <textarea id="sideEffectsText" rows="3" placeholder="z. B. Appetit, Kopfschmerzen, Unruhe, Mundtrockenheit – möglichst mit Zeitpunkt und Intensität"></textarea>
+          <p class="helper-text">Nur zur Dokumentation für dich und gegebenenfalls für ein ärztliches Gespräch. Die App bewertet die Beschwerden nicht.</p>
+        </div>
+
+        <label class="block-label">Was bremst mich gerade am meisten?</label>
+        <div id="bottleneckChips" class="chip-select" aria-label="Aktuellen Engpass auswählen"></div>
+
+        <div id="adhdSupportBox" class="support-box">
+          <strong>Ein nächster Schritt</strong>
+          <p>Fülle ein paar Felder aus. Danach schlägt dir der Planer einen kleinen, konkreten nächsten Schritt vor.</p>
+        </div>
+        <p class="privacy-note">Die Medikamentenangabe dient nur dem Beobachten von Mustern. Verändere Einnahme oder Dosis nicht aufgrund der App, sondern besprich Auffälligkeiten ärztlich.</p>
+      </section>
+
+      <section class="card calendar-card">
+        <div class="section-heading top-align">
+          <div>
+            <p class="eyebrow">APPLE KALENDER</p>
+            <h2>Termine an diesem Tag</h2>
+          </div>
+          <button id="refreshCalendarButton" class="ghost-button small-button" type="button">Aktualisieren</button>
+        </div>
+        <p id="calendarStatus" class="helper-text">Noch kein Kalender verbunden.</p>
+        <div id="calendarEventList" class="calendar-event-list"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">AUFGABEN</p>
+            <h2>Was steht an?</h2>
+          </div>
+          <span id="taskCounter" class="counter">0 offen</span>
+        </div>
+        <div id="taskList" class="task-list"></div>
+        <p id="emptyTasks" class="empty-state">Noch keine Aufgaben eingetragen.</p>
+      </section>
+
+      <section class="card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">BASIS VOR PRODUKTIVITÄT</p>
+            <h2>Grundversorgung ohne Perfektionsdruck</h2>
+          </div>
+          <span id="habitCounter" class="counter">0 erledigt</span>
+        </div>
+        <p class="helper-text">Offen bedeutet nicht gescheitert. Markiere „erledigt“ oder „heute nicht relevant“. Der Rest bleibt einfach sichtbar.</p>
+        <div id="habitList" class="habit-list"></div>
+      </section>
+
+      <section class="card journal-card">
+        <div class="section-heading top-align">
+          <div>
+            <p class="eyebrow">TAGESJOURNAL</p>
+            <h2>Was hat mich heute bewegt?</h2>
+          </div>
+          <span id="journalSaveStatus" class="save-status">gespeichert</span>
+        </div>
+        <p class="helper-text">Schreib frei. Deine Gedanken bleiben standardmäßig nur auf diesem Gerät.</p>
+        <textarea id="journalText" rows="10" placeholder="Heute war …\nIch habe gefühlt …\nMich hat beschäftigt …\nEin Moment, der mir nachgeht …"></textarea>
+        <div class="journal-actions">
+          <button id="createReflectionButton" class="primary-button grow">Gefühlsreflexion erstellen</button>
+          <button id="clearReflectionButton" class="ghost-button" hidden>Neu auswerten</button>
+        </div>
+        <div id="reflectionOutput" class="reflection-placeholder">
+          Nach der Auswertung siehst du eine kurze Zusammenfassung, mögliche Gefühle, erkannte Muster und eine Reflexionsfrage.
+        </div>
+        <p class="privacy-note">Die Auswertung unterstützt die Selbstreflexion, ist aber keine psychologische Diagnose oder Krisenhilfe.</p>
+      </section>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Hauptnavigation">
+    <button id="homeTab" class="tab active" data-view="home"><span>⌂</span><small>Heute</small></button>
+    <button id="weekTab" class="tab" data-view="week"><span>▦</span><small>Woche</small></button>
+    <button id="dayTab" class="tab" data-view="day"><span>□</span><small>Tag</small></button>
+  </nav>
+
+  <dialog id="taskDialog">
+    <form method="dialog" id="taskForm" class="dialog-card">
+      <div class="section-heading">
+        <h2 id="taskDialogTitle">Neue Aufgabe</h2>
+        <button type="button" id="closeTaskDialog" class="icon-button" aria-label="Schließen">×</button>
+      </div>
+      <label for="taskTitle">Aufgabe</label>
+      <input id="taskTitle" required maxlength="140" placeholder="Was möchtest du erledigen?" />
+      <div class="form-grid">
+        <div>
+          <label for="taskTime">Uhrzeit</label>
+          <input id="taskTime" type="time" />
+        </div>
+        <div>
+          <label for="taskCategory">Kategorie</label>
+          <select id="taskCategory">
+            <option value="schule">Schule</option>
+            <option value="termin">Termin</option>
+            <option value="privat">Privat</option>
+            <option value="gesundheit">Gesundheit</option>
+            <option value="erholung">Erholung</option>
+          </select>
+        </div>
+      </div>
+      <input id="taskId" type="hidden" />
+      <button class="primary-button full-width" value="save">Speichern</button>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog">
+    <div class="dialog-card settings-card">
+      <div class="section-heading">
+        <h2>Einstellungen & Datenschutz</h2>
+        <button type="button" id="closeSettingsDialog" class="icon-button" aria-label="Schließen">×</button>
+      </div>
+
+      <section class="settings-section">
+        <h3>App</h3>
+        <button id="installButton" class="secondary-button full-width" hidden>App installieren</button>
+        <button id="exportButton" class="secondary-button full-width">Verschlüsselungsfreies Backup exportieren</button>
+        <label class="secondary-button full-width file-button">Backup importieren<input id="importInput" type="file" accept="application/json" /></label>
+      </section>
+
+      <section class="settings-section">
+        <h3>Apple-Kalender</h3>
+        <p class="helper-text">Für die automatische Aktualisierung wird ein eigener Kalender-Worker verwendet. In der App steht nur dessen Adresse; dein iCloud-Kalender-Link bleibt als Geheimnis im Worker.</p>
+        <label class="switch-row">
+          <span>Apple-Kalender automatisch laden</span>
+          <input id="calendarEnabled" type="checkbox" />
+        </label>
+        <label for="calendarEndpoint">Kalender-Worker-Endpunkt</label>
+        <input id="calendarEndpoint" type="url" placeholder="https://dein-kalender-worker.workers.dev" />
+        <div class="button-row">
+          <button id="testCalendarButton" class="secondary-button grow">Verbindung testen</button>
+          <label class="secondary-button grow file-button compact-file">ICS-Datei importieren<input id="calendarImportInput" type="file" accept=".ics,text/calendar" /></label>
+        </div>
+        <p id="calendarTestResult" class="settings-note"></p>
+        <p class="privacy-note">Ein öffentlicher iCloud-Kalender-Link ist grundsätzlich für Personen mit dem Link lesbar. Verwende dafür am besten einen eigenen Kalender, der nur die Termine enthält, die im Planer erscheinen sollen.</p>
+      </section>
+
+      <section class="settings-section">
+        <h3>Optionale KI-Auswertung</h3>
+        <p class="helper-text">Ohne Einstellung läuft die private Offline-Auswertung. Ein eigener sicherer Server-Endpunkt kann bessere Formulierungen erzeugen. Trage hier niemals einen API-Schlüssel ein.</p>
+        <label class="switch-row">
+          <span>Eigenen KI-Endpunkt verwenden</span>
+          <input id="aiEnabled" type="checkbox" />
+        </label>
+        <label for="aiEndpoint">Server-Endpunkt</label>
+        <input id="aiEndpoint" type="url" placeholder="https://dein-worker.example.workers.dev" />
+        <button id="testAiButton" class="secondary-button full-width">Verbindung testen</button>
+        <p id="aiTestResult" class="settings-note"></p>
+      </section>
+
+      <section class="settings-section danger-zone">
+        <h3>Daten löschen</h3>
+        <button id="clearButton" class="danger-button full-width">Alle lokalen Daten löschen</button>
+      </section>
+
+      <p class="settings-note">Journal, Aufgaben und Auswertungen werden im Browser gespeichert. Ein Browserdaten-Löschen kann diese Daten entfernen. Regelmäßige Backups sind sinnvoll.</p>
+    </div>
+  </dialog>
+
+  <template id="taskTemplate">
+    <article class="task-item">
+      <button class="check-button" aria-label="Aufgabe abhaken"></button>
+      <div class="task-content"><strong class="task-title"></strong><div class="task-meta"></div></div>
+      <button class="edit-button" aria-label="Aufgabe bearbeiten">✎</button>
+      <button class="delete-button" aria-label="Aufgabe löschen">×</button>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
