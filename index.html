@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#ff5fa2" />
   <meta name="description" content="Privater Wochen- und Tagesplaner mit Journal und Gefühlsreflexion." />
   <meta name="color-scheme" content="light" />
-  <link rel="manifest" href="manifest.webmanifest?v=7" />
+  <link rel="manifest" href="manifest.webmanifest?v=8" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="styles.css?v=7" />
+  <link rel="stylesheet" href="styles.css?v=8" />
   <title>Mein Tageskompass</title>
 </head>
 <body>
@@ -120,6 +120,20 @@
         <textarea id="weeklyFocus" rows="2" placeholder="Was soll diese Woche Orientierung geben?"></textarea>
       </div>
       <div id="weekDays" class="week-days"></div>
+      <section class="card archive-card">
+        <div class="section-heading top-align">
+          <div><p class="eyebrow">JOURNALARCHIV</p><h2>Vergangene Wochen wiederfinden</h2></div>
+          <span aria-hidden="true" class="archive-doodle">📚</span>
+        </div>
+        <div class="archive-filters">
+          <label>Jahr<select id="archiveYear"></select></label>
+          <label>Monat<select id="archiveMonth"><option value="">Alle Monate</option></select></label>
+        </div>
+        <label for="archiveSearch">Im Journal suchen</label>
+        <input id="archiveSearch" type="search" placeholder="z. B. Referendariat, Therapie oder Urlaub" />
+        <div id="journalArchive" class="journal-archive"></div>
+        <p id="journalArchiveEmpty" class="empty-state">Für diesen Zeitraum wurden keine Journaleinträge gefunden.</p>
+      </section>
       <section class="card">
         <div class="section-heading">
           <div>
@@ -278,8 +292,58 @@
           </select>
         </div>
       </div>
+      <fieldset class="recurrence-fieldset">
+        <legend>Wiederholen</legend>
+        <label for="taskRepeat">Rhythmus</label>
+        <select id="taskRepeat">
+          <option value="none">Nie – einmalige Aufgabe</option>
+          <option value="daily">Täglich</option>
+          <option value="weekly">Wöchentlich</option>
+          <option value="monthly">Monatlich</option>
+          <option value="custom">Bestimmte Wochentage</option>
+        </select>
+        <div id="taskWeekdaysWrap" class="weekday-picker" hidden>
+          <span>Immer an diesen Tagen</span>
+          <div id="taskWeekdays" class="weekday-buttons">
+            <button type="button" data-weekday="1">Mo</button><button type="button" data-weekday="2">Di</button>
+            <button type="button" data-weekday="3">Mi</button><button type="button" data-weekday="4">Do</button>
+            <button type="button" data-weekday="5">Fr</button><button type="button" data-weekday="6">Sa</button>
+            <button type="button" data-weekday="0">So</button>
+          </div>
+        </div>
+        <div id="taskRepeatOptions" class="repeat-options" hidden>
+          <label for="taskRepeatEnd">Endet am <span class="optional-label">optional</span></label>
+          <input id="taskRepeatEnd" type="date" />
+        </div>
+        <div id="taskEditScopeWrap" hidden>
+          <label for="taskEditScope">Änderung anwenden auf</label>
+          <select id="taskEditScope">
+            <option value="one">Nur dieses Vorkommen</option>
+            <option value="future">Dieses und alle zukünftigen</option>
+            <option value="all">Die gesamte Serie</option>
+          </select>
+        </div>
+      </fieldset>
       <input id="taskId" type="hidden" />
+      <input id="taskSeriesId" type="hidden" />
+      <input id="taskOccurrenceDate" type="hidden" />
       <button class="primary-button full-width" value="save">Speichern</button>
+    </form>
+  </dialog>
+
+  <dialog id="weekJumpDialog">
+    <form method="dialog" id="weekJumpForm" class="dialog-card">
+      <div class="section-heading">
+        <div><p class="eyebrow">ZEITREISE</p><h2>Zu einer Woche springen</h2></div>
+        <button type="button" id="closeWeekJump" class="icon-button" aria-label="Schließen">×</button>
+      </div>
+      <p class="helper-text">Wähle Jahr und Kalenderwoche. Die Woche öffnet sich direkt, ohne langes Zurückklicken.</p>
+      <div class="week-jump-grid">
+        <label for="jumpYear">Jahr<input id="jumpYear" type="number" min="2000" max="2100" inputmode="numeric" /></label>
+        <label for="jumpWeek">Kalenderwoche<input id="jumpWeek" type="number" min="1" max="53" inputmode="numeric" /></label>
+      </div>
+      <button class="primary-button full-width" value="jump">KW öffnen</button>
+      <button type="button" id="jumpToday" class="secondary-button full-width">Zur aktuellen Woche</button>
     </form>
   </dialog>
 
@@ -347,6 +411,6 @@
     </article>
   </template>
 
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

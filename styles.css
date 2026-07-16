@@ -361,3 +361,24 @@ dialog{background:transparent}.dialog-card{border:3px solid var(--text);border-r
   .card{padding:14px}.bottom-nav{width:calc(100% - 16px)}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* Wiederholungen, KW-Sprung und Journalarchiv */
+.recurrence-fieldset{margin:18px 0 4px;padding:14px;border:2px dashed var(--text);border-radius:14px;background:#fff2ad}
+.recurrence-fieldset legend{padding:4px 9px;border:2px solid var(--text);border-radius:8px;background:var(--pink);font-family:"Marker Felt","Comic Sans MS",cursive;font-weight:900;box-shadow:2px 2px 0 var(--text)}
+.repeat-options,.weekday-picker,#taskEditScopeWrap{margin-top:13px}
+.weekday-picker>span{display:block;margin-bottom:8px;font-size:.82rem;font-weight:850}
+.weekday-buttons{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.weekday-buttons button{min-width:0;min-height:38px;padding:0;border:2px solid var(--text);border-radius:8px;background:#fff;color:var(--text);font-size:.7rem;font-weight:900;box-shadow:2px 2px 0 var(--text)}
+.weekday-buttons button:nth-child(3n+1){background:#ffd1e5}.weekday-buttons button:nth-child(3n+2){background:#cfe8ff}.weekday-buttons button:nth-child(3n){background:#c8f3d8}
+.weekday-buttons button.selected{background:var(--violet-soft);transform:translate(2px,2px);box-shadow:none;outline:2px solid var(--text)}
+.recurring-task{position:relative}.recurring-task::before{content:"↻";position:absolute;right:-7px;top:-9px;display:grid;place-items:center;width:23px;height:23px;border:2px solid var(--text);border-radius:50%;background:var(--yellow);font-weight:950;transform:rotate(10deg)}
+.week-jump-grid,.archive-filters{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.archive-card{position:relative;background:#e0d2ff!important}.archive-card::before{content:"";position:absolute;width:70px;height:16px;left:35%;top:-10px;background:rgba(255,230,92,.8);transform:rotate(2deg)}
+.archive-doodle{font-size:1.8rem;transform:rotate(8deg)}
+.archive-filters{margin-bottom:12px}.archive-filters label{margin-bottom:0}
+.journal-archive{display:grid;gap:9px;margin-top:14px}
+.archive-week{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;width:100%;padding:10px;border:2px solid var(--text);border-radius:11px;background:#fff;color:var(--text);text-align:left;box-shadow:3px 3px 0 var(--text)}
+.archive-week:nth-child(4n+1){background:#ffd6e7}.archive-week:nth-child(4n+2){background:#d0efff}.archive-week:nth-child(4n+3){background:#fff0a8}.archive-week:nth-child(4n){background:#d0f1dc}
+.archive-week-number{padding:7px;border:2px solid var(--text);border-radius:8px;background:#fff;font-family:"Marker Felt","Comic Sans MS",cursive;font-weight:900;white-space:nowrap}
+.archive-week strong,.archive-week small{display:block}.archive-week small{margin-top:3px;color:var(--muted);font-size:.7rem;line-height:1.3}
+@media(max-width:430px){.week-jump-grid,.archive-filters{grid-template-columns:1fr 1fr}.weekday-buttons{gap:3px}.weekday-buttons button{font-size:.62rem}}

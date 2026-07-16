@@ -99,25 +99,28 @@ let saveTimer = null;
 let deferredInstallPrompt = null;
 
 const el = Object.fromEntries([
-  "pageTitle","headerSubtitle","homeView","weekView","dayView","weekDays","weeklyFocus","weekReflection","createWeekReflection",
+  "pageTitle","headerSubtitle","homeView","weekView","dayView","weekDays","weeklyFocus","weekReflection","createWeekReflection","archiveYear","archiveMonth","archiveSearch","journalArchive","journalArchiveEmpty",
   "homeGreeting","homeDate","homeOpenDay","homeQuickTask","homeWeekStrip","homePriority","homeSupport","homeCare","homeCareBar","homeEvents","homeEventsEmpty","homeRefreshCalendar","homeCheckinCount","homeCheckinSummary","homeJournalTitle","homeJournalText","homeOpenJournal","homeTab","homeQuote","weatherStatus","weatherIcon","weatherValues","weatherCurrent","weatherHigh","weatherLow","weatherButton",
   "dayHeading","dayPriority","checkinStatus","checkinGrid","sleepHours","medicationState","sideEffectsWrap","sideEffectsText","bottleneckChips","adhdSupportBox","calendarStatus","calendarEventList","refreshCalendarButton","taskCounter","taskList","emptyTasks","habitCounter","habitList",
   "journalText","journalSaveStatus","reflectionOutput","createReflectionButton","clearReflectionButton","previousButton","nextButton",
   "dateButton","weekTab","dayTab","addTaskButton","taskDialog","taskForm","taskDialogTitle","taskTitle","taskTime","taskCategory",
-  "taskId","closeTaskDialog","taskTemplate","settingsButton","settingsDialog","closeSettingsDialog","installButton","exportButton",
+  "taskId","taskSeriesId","taskOccurrenceDate","taskRepeat","taskRepeatEnd","taskRepeatOptions","taskWeekdaysWrap","taskWeekdays","taskEditScopeWrap","taskEditScope","closeTaskDialog","taskTemplate","weekJumpDialog","weekJumpForm","closeWeekJump","jumpYear","jumpWeek","jumpToday","settingsButton","settingsDialog","closeSettingsDialog","installButton","exportButton",
   "importInput","clearButton","calendarEnabled","calendarEndpoint","calendarAccessKey","testCalendarButton","calendarImportInput","calendarTestResult","aiEnabled","aiEndpoint","testAiButton","aiTestResult"
 ].map(id => [id, document.getElementById(id)]));
 
 function defaultState() {
-  return { version: 4, days: {}, weeks: {}, calendarEvents: [], calendarLastSync: "", settings: { aiEnabled: false, aiEndpoint: "", calendarEnabled: false, calendarEndpoint: "" } };
+  return { version: 5, days: {}, weeks: {}, recurringTasks: [], calendarEvents: [], calendarLastSync: "", settings: { aiEnabled: false, aiEndpoint: "", calendarEnabled: false, calendarEndpoint: "" } };
 }
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : defaultState();
-    return Object.assign(defaultState(), parsed, {
+    const migrated = Object.assign(defaultState(), parsed, {
       settings: Object.assign(defaultState().settings, parsed.settings || {})
     });
+    migrated.version = 5;
+    migrated.recurringTasks = Array.isArray(migrated.recurringTasks) ? migrated.recurringTasks : [];
+    return migrated;
   } catch (error) {
     console.warn("Gespeicherte Daten konnten nicht gelesen werden.", error);
     return defaultState();
@@ -152,6 +155,22 @@ function mondayOf(date) {
   const d = new Date(date); const day = d.getDay() || 7;
   d.setDate(d.getDate() - day + 1); d.setHours(0,0,0,0); return d;
 }
+function daysBetween(a,b) {
+  const left=new Date(a); const right=new Date(b);
+  left.setHours(12,0,0,0); right.setHours(12,0,0,0);
+  return Math.round((right-left)/86400000);
+}
+function isoWeekInfo(date) {
+  const d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));
+  const day=d.getUTCDay()||7; d.setUTCDate(d.getUTCDate()+4-day);
+  const year=d.getUTCFullYear(); const yearStart=new Date(Date.UTC(year,0,1));
+  return {year,week:Math.ceil((((d-yearStart)/86400000)+1)/7)};
+}
+function dateFromIsoWeek(year,week) {
+  const jan4=new Date(year,0,4); const monday=mondayOf(jan4);
+  return addDays(monday,(week-1)*7);
+}
+function lastDayOfMonth(date) { return new Date(date.getFullYear(),date.getMonth()+1,0).getDate(); }
 function formatDate(date, options) { return new Intl.DateTimeFormat("de-DE", options).format(date); }
 function getDayData(date) {
   const key = isoDate(date);
@@ -247,13 +266,50 @@ async function refreshWeather(showLoading = true) {
 }
 function weatherIsStale(){const cached=readWeatherCache();return !cached||Date.now()-new Date(cached.updatedAt).getTime()>30*60*1000;}
 
+function seriesOccursOn(series,date) {
+  const key=isoDate(date); const start=new Date(`${series.startDate}T12:00:00`);
+  if(!series.startDate||key<series.startDate||(series.endDate&&key>series.endDate))return false;
+  if(series.exceptions?.[key]?.skipped)return false;
+  const diff=daysBetween(start,date);
+  if(diff<0)return false;
+  if(series.frequency==="daily")return diff%(series.interval||1)===0;
+  if(series.frequency==="weekly"){
+    const weeks=Math.floor(daysBetween(mondayOf(start),mondayOf(date))/7);
+    return weeks%(series.interval||1)===0&&date.getDay()===start.getDay();
+  }
+  if(series.frequency==="custom"){
+    const weeks=Math.floor(daysBetween(mondayOf(start),mondayOf(date))/7);
+    return weeks%(series.interval||1)===0&&(series.weekdays||[]).includes(date.getDay());
+  }
+  if(series.frequency==="monthly"){
+    const months=(date.getFullYear()-start.getFullYear())*12+date.getMonth()-start.getMonth();
+    const target=Math.min(start.getDate(),lastDayOfMonth(date));
+    return months>=0&&months%(series.interval||1)===0&&date.getDate()===target;
+  }
+  return false;
+}
+function recurringOccurrence(series,date) {
+  const key=isoDate(date); const override=series.exceptions?.[key]?.override||{};
+  return {id:`${series.id}@${key}`,seriesId:series.id,occurrenceDate:key,isRecurring:true,
+    title:override.title??series.title,time:override.time??series.time,category:override.category??series.category,
+    done:!!series.completions?.[key],frequency:series.frequency};
+}
+function tasksForDate(date) {
+  const data=getDayData(date);
+  const recurring=(state.recurringTasks||[]).filter(series=>seriesOccursOn(series,date)).map(series=>recurringOccurrence(series,date));
+  return [...data.tasks,...recurring];
+}
+function recurrenceLabel(frequency) {
+  return {daily:"täglich",weekly:"wöchentlich",monthly:"monatlich",custom:"ausgewählte Wochentage"}[frequency]||"";
+}
+
 function renderHomeWeek() {
   const monday = mondayOf(startOfToday());
   el.homeWeekStrip.innerHTML = "";
   for (let i = 0; i < 7; i++) {
     const date = addDays(monday, i);
     const data = getDayData(date);
-    const open = data.tasks.filter(task => !task.done).length;
+    const open = tasksForDate(date).filter(task => !task.done).length;
     const events = eventsForDate(date).length;
     const isToday = isoDate(date) === isoDate(startOfToday());
     const button = document.createElement("button");
@@ -321,7 +377,7 @@ function renderWeek() {
   el.weekDays.innerHTML = "";
   for (let i=0; i<7; i++) {
     const date = addDays(monday, i); const data = getDayData(date);
-    const open = data.tasks.filter(task => !task.done).length;
+    const open = tasksForDate(date).filter(task => !task.done).length;
     const journal = (data.journal || "").trim().length > 0;
     const calendarCount = eventsForDate(date).length;
     const regulation = data.checkin?.regulation || data.checkin?.mood || null;
@@ -338,6 +394,47 @@ function renderWeek() {
   const weekData = getWeekData(selectedDate);
   el.weeklyFocus.value = weekData.focus || "";
   renderWeekReflection(weekData.reflection);
+  renderJournalArchive();
+}
+function archiveYears(){
+  const years=new Set([new Date().getFullYear()]);
+  Object.keys(state.days||{}).forEach(key=>{if((state.days[key]?.journal||"").trim())years.add(Number(key.slice(0,4)));});
+  return [...years].filter(Number.isFinite).sort((a,b)=>b-a);
+}
+function renderArchiveFilters(){
+  const current=el.archiveYear.value||String(new Date().getFullYear());
+  el.archiveYear.innerHTML=archiveYears().map(year=>`<option value="${year}">${year}</option>`).join("");
+  el.archiveYear.value=archiveYears().includes(Number(current))?current:String(archiveYears()[0]);
+  if(el.archiveMonth.options.length===1){
+    const months=Array.from({length:12},(_,month)=>new Intl.DateTimeFormat("de-DE",{month:"long"}).format(new Date(2026,month,1)));
+    months.forEach((label,index)=>el.archiveMonth.insertAdjacentHTML("beforeend",`<option value="${index+1}">${escapeHtml(label)}</option>`));
+  }
+}
+function renderJournalArchive(){
+  renderArchiveFilters();
+  const year=Number(el.archiveYear.value); const month=Number(el.archiveMonth.value||0); const query=normalize(el.archiveSearch.value.trim());
+  const groups=new Map();
+  Object.entries(state.days||{}).forEach(([key,data])=>{
+    const journal=(data.journal||"").trim(); if(!journal)return;
+    const date=new Date(`${key}T12:00:00`); if(date.getFullYear()!==year||(month&&date.getMonth()+1!==month))return;
+    if(query&&!normalize(journal).includes(query))return;
+    const info=isoWeekInfo(date); const groupKey=`${info.year}-${String(info.week).padStart(2,"0")}`;
+    if(!groups.has(groupKey))groups.set(groupKey,{...info,dates:[],snippets:[]});
+    groups.get(groupKey).dates.push(date); groups.get(groupKey).snippets.push(journal.replace(/\s+/g," ").slice(0,110));
+  });
+  const entries=[...groups.values()].sort((a,b)=>b.year-a.year||b.week-a.week);
+  el.journalArchive.innerHTML="";
+  el.journalArchiveEmpty.hidden=entries.length>0;
+  entries.forEach(group=>{
+    const button=document.createElement("button"); button.type="button"; button.className="archive-week";
+    button.innerHTML=`<span class="archive-week-number">KW ${group.week}</span><span><strong>${group.dates.length} Journaltag${group.dates.length===1?"":"e"}</strong><small>${escapeHtml(group.snippets[0])}${group.snippets[0].length>=110?"…":""}</small></span><span>›</span>`;
+    button.addEventListener("click",()=>{selectedDate=dateFromIsoWeek(group.year,group.week);currentView="week";render();window.scrollTo({top:0,behavior:"smooth"});});
+    el.journalArchive.appendChild(button);
+  });
+}
+function openWeekJump(){
+  const info=isoWeekInfo(currentView==="home"?startOfToday():selectedDate);
+  el.jumpYear.value=info.year; el.jumpWeek.value=info.week; el.weekJumpDialog.showModal();
 }
 function renderDay() {
   const data = getDayData(selectedDate);
@@ -549,20 +646,39 @@ function parseIcsEvents(text) {
 
 function renderTasks(data) {
   el.taskList.innerHTML = "";
-  const sorted = [...data.tasks].sort((a,b) => Number(a.done)-Number(b.done) || (a.time||"99:99").localeCompare(b.time||"99:99"));
+  const sorted = tasksForDate(selectedDate).sort((a,b) => Number(a.done)-Number(b.done) || (a.time||"99:99").localeCompare(b.time||"99:99"));
   sorted.forEach(task => {
     const node = el.taskTemplate.content.cloneNode(true);
     const article = node.querySelector(".task-item"); article.classList.toggle("done", !!task.done);
+    article.classList.toggle("recurring-task",!!task.isRecurring);
     node.querySelector(".task-title").textContent = task.title;
-    node.querySelector(".task-meta").textContent = [task.time, categoryLabel(task.category)].filter(Boolean).join(" · ");
-    node.querySelector(".check-button").addEventListener("click", () => { task.done = !task.done; saveState(); renderTasks(data); });
+    node.querySelector(".task-meta").textContent = [task.time,categoryLabel(task.category),task.isRecurring?`↻ ${recurrenceLabel(task.frequency)}`:""].filter(Boolean).join(" · ");
+    node.querySelector(".check-button").addEventListener("click", () => {
+      if(task.isRecurring){
+        const series=state.recurringTasks.find(item=>item.id===task.seriesId);
+        series.completions=series.completions||{};
+        if(series.completions[task.occurrenceDate])delete series.completions[task.occurrenceDate];
+        else series.completions[task.occurrenceDate]=true;
+      } else task.done=!task.done;
+      saveState(); renderTasks(data);
+    });
     node.querySelector(".edit-button").addEventListener("click", () => openTaskDialog(task));
-    node.querySelector(".delete-button").addEventListener("click", () => { data.tasks = data.tasks.filter(item => item.id !== task.id); saveState(); renderTasks(data); });
+    node.querySelector(".delete-button").addEventListener("click", () => {
+      if(task.isRecurring){
+        const series=state.recurringTasks.find(item=>item.id===task.seriesId);
+        if(confirm("Nur dieses Vorkommen auslassen?\n\nOK = nur dieser Tag\nAbbrechen = weitere Auswahl")){
+          series.exceptions=series.exceptions||{}; series.exceptions[task.occurrenceDate]={...(series.exceptions[task.occurrenceDate]||{}),skipped:true};
+        } else if(confirm("Möchtest du stattdessen die gesamte Aufgabenserie löschen?")){
+          state.recurringTasks=state.recurringTasks.filter(item=>item.id!==task.seriesId);
+        } else return;
+      } else data.tasks=data.tasks.filter(item=>item.id!==task.id);
+      saveState(); renderTasks(data);
+    });
     el.taskList.appendChild(node);
   });
-  const open = data.tasks.filter(task => !task.done).length;
+  const open = sorted.filter(task => !task.done).length;
   el.taskCounter.textContent = `${open} offen`;
-  el.emptyTasks.hidden = data.tasks.length > 0;
+  el.emptyTasks.hidden = sorted.length > 0;
 }
 function renderHabits(data) {
   el.habitList.innerHTML = "";
@@ -600,8 +716,29 @@ function categoryLabel(category) {
 }
 function openTaskDialog(task=null) {
   el.taskForm.reset(); el.taskDialogTitle.textContent = task ? "Aufgabe bearbeiten" : "Neue Aufgabe";
-  el.taskId.value = task?.id || ""; el.taskTitle.value = task?.title || ""; el.taskTime.value = task?.time || ""; el.taskCategory.value = task?.category || "schule";
+  el.taskWeekdays.querySelectorAll("button").forEach(button=>button.classList.remove("selected"));
+  el.taskId.value = task?.isRecurring ? "" : (task?.id||"");
+  el.taskSeriesId.value=task?.seriesId||""; el.taskOccurrenceDate.value=task?.occurrenceDate||isoDate(selectedDate);
+  el.taskTitle.value=task?.title||""; el.taskTime.value=task?.time||""; el.taskCategory.value=task?.category||"schule";
+  const series=task?.isRecurring?state.recurringTasks.find(item=>item.id===task.seriesId):null;
+  el.taskRepeat.value=series?.frequency||"none"; el.taskRepeatEnd.value=series?.endDate||"";
+  (series?.weekdays||[]).forEach(day=>el.taskWeekdays.querySelector(`[data-weekday="${day}"]`)?.classList.add("selected"));
+  el.taskEditScopeWrap.hidden=!series; el.taskEditScope.value="one";
+  updateRepeatVisibility();
   el.taskDialog.showModal(); setTimeout(() => el.taskTitle.focus(), 50);
+}
+function updateRepeatVisibility(){
+  const repeated=el.taskRepeat.value!=="none";
+  el.taskRepeatOptions.hidden=!repeated;
+  el.taskWeekdaysWrap.hidden=el.taskRepeat.value!=="custom";
+}
+function selectedTaskWeekdays(){
+  return [...el.taskWeekdays.querySelectorAll("button.selected")].map(button=>Number(button.dataset.weekday));
+}
+function taskSeriesFromForm(startDate=isoDate(selectedDate)){
+  return {id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`,title:el.taskTitle.value.trim(),time:el.taskTime.value,
+    category:el.taskCategory.value,startDate,frequency:el.taskRepeat.value,interval:1,
+    weekdays:el.taskRepeat.value==="custom"?selectedTaskWeekdays():[],endDate:el.taskRepeatEnd.value||"",completions:{},exceptions:{}};
 }
 function switchView(view) { currentView = view; render(); }
 function navigate(direction) { selectedDate = addDays(selectedDate, currentView === "week" ? direction*7 : direction); render(); }
@@ -780,11 +917,14 @@ el.homeRefreshCalendar.addEventListener("click",()=>syncCalendar(false));
 el.weatherButton.addEventListener("click",()=>refreshWeather(true));
 el.previousButton.addEventListener("click",()=>navigate(-1));
 el.nextButton.addEventListener("click",()=>navigate(1));
-el.dateButton.addEventListener("click",()=>{selectedDate=startOfToday();render();});
+el.dateButton.addEventListener("click",openWeekJump);
 el.homeTab.addEventListener("click",()=>switchView("home"));
 el.weekTab.addEventListener("click",()=>switchView("week"));
 el.dayTab.addEventListener("click",()=>switchView("day"));
 el.weeklyFocus.addEventListener("input",()=>{getWeekData(selectedDate).focus=el.weeklyFocus.value;saveState();});
+el.archiveYear.addEventListener("change",renderJournalArchive);
+el.archiveMonth.addEventListener("change",renderJournalArchive);
+el.archiveSearch.addEventListener("input",renderJournalArchive);
 el.dayPriority.addEventListener("input",()=>{getDayData(selectedDate).priority=el.dayPriority.value;saveState();});
 el.sleepHours.addEventListener("input",()=>{const data=getDayData(selectedDate);data.sleepHours=el.sleepHours.value;saveState();});
 el.medicationState.addEventListener("change",()=>{const data=getDayData(selectedDate);data.medicationState=el.medicationState.value;if(data.medicationState!=="side_effects")data.sideEffects="";el.sideEffectsWrap.hidden=data.medicationState!=="side_effects";el.sideEffectsText.value=data.sideEffects||"";saveState();renderSupport(data);});
@@ -796,13 +936,43 @@ el.clearReflectionButton.addEventListener("click",()=>{const data=getDayData(sel
 el.createWeekReflection.addEventListener("click",createWeeklyReflection);
 el.addTaskButton.addEventListener("click",()=>openTaskDialog());
 el.closeTaskDialog.addEventListener("click",()=>el.taskDialog.close());
+el.taskRepeat.addEventListener("change",updateRepeatVisibility);
+el.taskWeekdays.addEventListener("click",event=>{const button=event.target.closest("button[data-weekday]");if(button)button.classList.toggle("selected");});
 el.taskForm.addEventListener("submit",event=>{
   event.preventDefault(); const title=el.taskTitle.value.trim(); if(!title)return;
+  if(el.taskRepeat.value==="custom"&&!selectedTaskWeekdays().length){alert("Wähle mindestens einen Wochentag aus.");return;}
   const data=getDayData(selectedDate); const existing=data.tasks.find(t=>t.id===el.taskId.value);
-  if(existing){existing.title=title;existing.time=el.taskTime.value;existing.category=el.taskCategory.value;}
-  else data.tasks.push({id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`,title,time:el.taskTime.value,category:el.taskCategory.value,done:false});
+  const series=state.recurringTasks.find(item=>item.id===el.taskSeriesId.value);
+  if(series){
+    const scope=el.taskEditScope.value; const occurrence=el.taskOccurrenceDate.value;
+    if(scope==="one"){
+      series.exceptions=series.exceptions||{}; series.exceptions[occurrence]={...(series.exceptions[occurrence]||{}),override:{title,time:el.taskTime.value,category:el.taskCategory.value}};
+    } else if(scope==="future"){
+      series.endDate=isoDate(addDays(new Date(`${occurrence}T12:00:00`),-1));
+      if(el.taskRepeat.value==="none")getDayData(new Date(`${occurrence}T12:00:00`)).tasks.push({id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}`,title,time:el.taskTime.value,category:el.taskCategory.value,done:false});
+      else state.recurringTasks.push(taskSeriesFromForm(occurrence));
+    } else {
+      if(el.taskRepeat.value==="none"){
+        state.recurringTasks=state.recurringTasks.filter(item=>item.id!==series.id);
+        getDayData(new Date(`${occurrence}T12:00:00`)).tasks.push({id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}`,title,time:el.taskTime.value,category:el.taskCategory.value,done:false});
+      } else Object.assign(series,{title,time:el.taskTime.value,category:el.taskCategory.value,frequency:el.taskRepeat.value,
+          weekdays:el.taskRepeat.value==="custom"?selectedTaskWeekdays():[],endDate:el.taskRepeatEnd.value||""});
+    }
+  } else if(existing&&el.taskRepeat.value==="none"){
+    existing.title=title;existing.time=el.taskTime.value;existing.category=el.taskCategory.value;
+  } else if(el.taskRepeat.value!=="none"){
+    if(existing)data.tasks=data.tasks.filter(item=>item.id!==existing.id);
+    state.recurringTasks.push(taskSeriesFromForm());
+  } else data.tasks.push({id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`,title,time:el.taskTime.value,category:el.taskCategory.value,done:false});
   saveState();el.taskDialog.close();renderTasks(data);
 });
+el.closeWeekJump.addEventListener("click",()=>el.weekJumpDialog.close());
+el.weekJumpForm.addEventListener("submit",event=>{
+  event.preventDefault(); const year=Number(el.jumpYear.value); const week=Number(el.jumpWeek.value);
+  if(year<2000||year>2100||week<1||week>53)return;
+  selectedDate=dateFromIsoWeek(year,week);currentView="week";el.weekJumpDialog.close();render();
+});
+el.jumpToday.addEventListener("click",()=>{selectedDate=startOfToday();currentView="week";el.weekJumpDialog.close();render();});
 
 el.settingsButton.addEventListener("click",()=>{el.calendarEnabled.checked=!!state.settings.calendarEnabled;el.calendarEndpoint.value=state.settings.calendarEndpoint||"";el.calendarAccessKey.value=localStorage.getItem(CALENDAR_KEY_STORAGE)||"";el.calendarTestResult.textContent="";el.aiEnabled.checked=!!state.settings.aiEnabled;el.aiEndpoint.value=state.settings.aiEndpoint||"";el.aiTestResult.textContent="";el.settingsDialog.showModal();});
 el.closeSettingsDialog.addEventListener("click",()=>el.settingsDialog.close());
@@ -829,7 +999,7 @@ el.exportButton.addEventListener("click",()=>{
 });
 el.importInput.addEventListener("change",async event=>{
   const file=event.target.files?.[0];if(!file)return;
-  try { const imported=JSON.parse(await file.text()); if(!imported.days||!imported.weeks)throw new Error(); Object.keys(state).forEach(k=>delete state[k]);Object.assign(state,defaultState(),imported);saveState();render();el.settingsDialog.close(); }
+  try { const imported=JSON.parse(await file.text()); if(!imported.days||!imported.weeks)throw new Error(); Object.keys(state).forEach(k=>delete state[k]);Object.assign(state,defaultState(),imported);state.version=5;state.recurringTasks=Array.isArray(state.recurringTasks)?state.recurringTasks:[];saveState();render();el.settingsDialog.close(); }
   catch { alert("Die Backup-Datei konnte nicht gelesen werden."); }
   finally { event.target.value=""; }
 });
@@ -838,7 +1008,7 @@ el.clearButton.addEventListener("click",()=>{if(!confirm("Wirklich alle Aufgaben
 if("serviceWorker" in navigator){
   window.addEventListener("load",async()=>{
     try {
-      const registration=await navigator.serviceWorker.register("./service-worker.js?v=7",{updateViaCache:"none"});
+      const registration=await navigator.serviceWorker.register("./service-worker.js?v=8",{updateViaCache:"none"});
       await registration.update();
     } catch(error) { console.warn(error); }
   });
