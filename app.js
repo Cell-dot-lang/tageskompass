@@ -350,8 +350,8 @@ function renderHome() {
   el.homeEventsEmpty.hidden = events.length > 0;
   events.forEach(event => {
     const card = document.createElement("article");
-    card.className = "calendar-event";
-    card.innerHTML = `<div class="calendar-time">${escapeHtml(eventTimeLabel(event))}</div><div class="calendar-event-content"><strong>${escapeHtml(event.title)}</strong>${event.location?`<span>📍 ${escapeHtml(event.location)}</span>`:""}</div>`;
+    card.className = "calendar-event"; decorateCalendarCard(card,event);
+    card.innerHTML = `<div class="calendar-time">${escapeHtml(eventTimeLabel(event))}</div><div class="calendar-event-content"><span class="calendar-source"><i></i>${escapeHtml(event.calendarName)}</span><strong>${escapeHtml(event.title)}</strong>${event.location?`<span>📍 ${escapeHtml(event.location)}</span>`:""}</div>`;
     el.homeEvents.appendChild(card);
   });
 
@@ -556,8 +556,21 @@ function normalizeCalendarEvent(event) {
     end: event.end ? String(event.end) : "",
     allDay: !!event.allDay,
     location: String(event.location || ""),
-    notes: String(event.notes || "")
+    notes: String(event.notes || ""),
+    calendarId: String(event.calendarId || "icloud"),
+    calendarName: String(event.calendarName || "iCloud Kalender"),
+    calendarColor: /^#[0-9a-f]{6}$/i.test(event.calendarColor||"") ? event.calendarColor : ""
   };
+}
+function calendarColor(event){
+  if(/^#[0-9a-f]{6}$/i.test(event.calendarColor||""))return event.calendarColor;
+  const palette=["#3186ff","#27a66a","#f47b20","#ff4f9a","#7651d6","#e2a600","#18a7a0","#d64b55"];
+  let hash=0;for(const char of event.calendarId||event.calendarName||"icloud")hash=(hash*31+char.charCodeAt(0))>>>0;
+  return palette[hash%palette.length];
+}
+function decorateCalendarCard(card,event){
+  card.style.setProperty("--calendar-color",calendarColor(event));
+  card.classList.add("calendar-colored");
 }
 function eventLocalDateKey(event) {
   if (event.allDay && /^\d{4}-\d{2}-\d{2}/.test(event.start)) return event.start.slice(0,10);
@@ -589,8 +602,8 @@ function renderCalendarEvents() {
     ? `${events.length} Termin${events.length===1?"":"e"}${last && !Number.isNaN(last.getTime()) ? ` · zuletzt aktualisiert ${new Intl.DateTimeFormat("de-DE",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}).format(last)}` : ""}`
     : `Keine Termine an diesem Tag${last && !Number.isNaN(last.getTime()) ? ` · zuletzt aktualisiert ${new Intl.DateTimeFormat("de-DE",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}).format(last)}` : ""}.`;
   events.forEach(event => {
-    const card = document.createElement("article"); card.className = "calendar-event";
-    card.innerHTML = `<div class="calendar-time">${escapeHtml(eventTimeLabel(event))}</div><div class="calendar-event-content"><strong>${escapeHtml(event.title)}</strong>${event.location?`<span>📍 ${escapeHtml(event.location)}</span>`:""}${event.notes?`<small>${escapeHtml(event.notes)}</small>`:""}</div>`;
+    const card = document.createElement("article"); card.className = "calendar-event"; decorateCalendarCard(card,event);
+    card.innerHTML = `<div class="calendar-time">${escapeHtml(eventTimeLabel(event))}</div><div class="calendar-event-content"><span class="calendar-source"><i></i>${escapeHtml(event.calendarName)}</span><strong>${escapeHtml(event.title)}</strong>${event.location?`<span>📍 ${escapeHtml(event.location)}</span>`:""}${event.notes?`<small>${escapeHtml(event.notes)}</small>`:""}</div>`;
     el.calendarEventList.appendChild(card);
   });
 }
@@ -610,7 +623,8 @@ async function syncCalendar(showResult = false) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
     if (!Array.isArray(payload.events)) throw new Error("Ungültige Kalenderantwort");
-    state.calendarEvents = payload.events.map(normalizeCalendarEvent).filter(Boolean);
+    const freshEvents=payload.events.map(normalizeCalendarEvent).filter(Boolean);
+    state.calendarEvents=[...new Map(freshEvents.map(event=>[event.id,event])).values()];
     state.calendarLastSync = new Date().toISOString();
     saveState(); render();
     if (showResult) el.calendarTestResult.textContent = `${state.calendarEvents.length} Termine aus deinen privaten iCloud-Kalendern geladen.`;
@@ -1029,7 +1043,7 @@ el.clearButton.addEventListener("click",()=>{if(!confirm("Wirklich alle Aufgaben
 if("serviceWorker" in navigator){
   window.addEventListener("load",async()=>{
     try {
-      const registration=await navigator.serviceWorker.register("./service-worker.js?v=9",{updateViaCache:"none"});
+      const registration=await navigator.serviceWorker.register("./service-worker.js?v=10",{updateViaCache:"none"});
       await registration.update();
     } catch(error) { console.warn(error); }
   });

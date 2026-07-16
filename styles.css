@@ -394,3 +394,9 @@ dialog{background:transparent}.dialog-card{border:3px solid var(--text);border-r
 .task-item.category-other,.task-group-heading.category-other{background:#fff0a8}
 .task-item{border-left-width:8px}
 .task-item.category-schule{border-left-color:#3186ff}.task-item.category-gesundheit{border-left-color:#27a66a}.task-item.category-termin{border-left-color:#f47b20}.task-item.category-privat{border-left-color:#ff4f9a}.task-item.category-erholung{border-left-color:#7651d6}
+
+/* Farben der importierten iCloud-Kalender */
+.calendar-event.calendar-colored{position:relative;border-left:11px solid var(--calendar-color);background:color-mix(in srgb,var(--calendar-color) 13%,#fff 87%)}
+.calendar-event.calendar-colored .calendar-time{color:var(--text)}
+.calendar-source{display:inline-flex!important;align-items:center;gap:5px;width:max-content;max-width:100%;padding:3px 7px;border:1.5px solid var(--text);border-radius:999px;background:#fff!important;color:var(--text)!important;font-size:.62rem!important;font-weight:900;line-height:1}
+.calendar-source i{display:inline-block;width:9px;height:9px;border:1px solid var(--text);border-radius:50%;background:var(--calendar-color);flex:0 0 auto}
