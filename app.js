@@ -646,11 +646,25 @@ function parseIcsEvents(text) {
 
 function renderTasks(data) {
   el.taskList.innerHTML = "";
-  const sorted = tasksForDate(selectedDate).sort((a,b) => Number(a.done)-Number(b.done) || (a.time||"99:99").localeCompare(b.time||"99:99"));
+  const categoryOrder={schule:0,gesundheit:1,termin:2,privat:3,erholung:4};
+  const sorted = tasksForDate(selectedDate).sort((a,b) =>
+    (categoryOrder[a.category]??9)-(categoryOrder[b.category]??9) ||
+    Number(a.done)-Number(b.done) ||
+    (a.time||"99:99").localeCompare(b.time||"99:99"));
+  let currentCategory="";
   sorted.forEach(task => {
+    if(task.category!==currentCategory){
+      currentCategory=task.category;
+      const info=categoryInfo(currentCategory);
+      const heading=document.createElement("div");
+      heading.className=`task-group-heading category-${currentCategory||"other"}`;
+      heading.innerHTML=`<span>${info.icon}</span><strong>${escapeHtml(info.label)}</strong><small>${sorted.filter(item=>item.category===currentCategory&&!item.done).length} offen</small>`;
+      el.taskList.appendChild(heading);
+    }
     const node = el.taskTemplate.content.cloneNode(true);
     const article = node.querySelector(".task-item"); article.classList.toggle("done", !!task.done);
     article.classList.toggle("recurring-task",!!task.isRecurring);
+    article.classList.add(`category-${task.category||"other"}`);
     node.querySelector(".task-title").textContent = task.title;
     node.querySelector(".task-meta").textContent = [task.time,categoryLabel(task.category),task.isRecurring?`↻ ${recurrenceLabel(task.frequency)}`:""].filter(Boolean).join(" · ");
     node.querySelector(".check-button").addEventListener("click", () => {
@@ -713,6 +727,13 @@ function renderHabits(data) {
 }
 function categoryLabel(category) {
   return {schule:"Schule",termin:"Termin",privat:"Privat",gesundheit:"Gesundheit",erholung:"Erholung"}[category] || "";
+}
+function categoryInfo(category) {
+  return {
+    schule:{label:"Schule",icon:"📚"},gesundheit:{label:"Gesundheit",icon:"🌿"},
+    termin:{label:"Termine",icon:"📅"},privat:{label:"Privat",icon:"🏠"},
+    erholung:{label:"Erholung",icon:"☁️"}
+  }[category]||{label:"Sonstiges",icon:"✦"};
 }
 function openTaskDialog(task=null) {
   el.taskForm.reset(); el.taskDialogTitle.textContent = task ? "Aufgabe bearbeiten" : "Neue Aufgabe";
@@ -1008,7 +1029,7 @@ el.clearButton.addEventListener("click",()=>{if(!confirm("Wirklich alle Aufgaben
 if("serviceWorker" in navigator){
   window.addEventListener("load",async()=>{
     try {
-      const registration=await navigator.serviceWorker.register("./service-worker.js?v=8",{updateViaCache:"none"});
+      const registration=await navigator.serviceWorker.register("./service-worker.js?v=9",{updateViaCache:"none"});
       await registration.update();
     } catch(error) { console.warn(error); }
   });

@@ -2,7 +2,7 @@
   "name": "Tageskompass – ADHS Planer",
   "short_name": "Tageskompass",
   "description": "ADHS-informierter Tages- und Wochenplaner mit Apple-Kalender, Grundversorgung, Medikamentenprotokoll und Journal.",
-  "start_url": "./?app=v8",
+  "start_url": "./?app=v9",
   "scope": "./",
   "display": "standalone",
   "background_color": "#fff8df",
